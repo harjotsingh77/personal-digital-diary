@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Diary uses the microphone to record voice notes. Recordings are encrypted and stay on this Mac.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Diary uses the camera to record video notes. Recordings are encrypted and stay on this Mac.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Diary can turn voice notes into text. Recognition runs on this Mac and nothing is sent anywhere.</string>
+</dict>
+</plist>

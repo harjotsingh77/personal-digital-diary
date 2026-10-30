@@ -1,0 +1,52 @@
+[package]
+name = "personal-digital-diary"
+version = "0.1.0"
+description = "A private, offline, encrypted personal diary"
+edition = "2021"
+
+[lib]
+name = "diary_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+# Local SQLite, compiled in (no system lib needed).
+rusqlite = { version = "0.37", features = ["bundled"] }
+# Crypto: Argon2id for password hashing / key derivation, AES-256-GCM for content.
+argon2 = "0.5"
+aes-gcm = "0.10"
+rand = "0.8"
+zeroize = { version = "1", features = ["derive"] }
+tauri-plugin-dialog = "2.8.3"
+base64 = "0.23.1"
+
+# Argon2 is painfully slow without optimisations; keep crypto crates fast
+# even in `tauri dev` so unlocking doesn't take 20+ seconds.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
+[profile.dev.package.aes-gcm]
+opt-level = 3
+[profile.dev.package.aes]
+opt-level = 3
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+strip = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6.2"
+objc2 = "0.6.5"
+objc2-foundation = "0.3.2"
+objc2-local-authentication = "0.3.2"
+security-framework = "3.7.0"
+objc2-speech = "0.3.2"
