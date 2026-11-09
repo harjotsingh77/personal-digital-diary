@@ -1,0 +1,72 @@
+# Builds an unsigned iPhone app (Diary.ipa) on GitHub's Macs, so no Xcode is
+# needed locally. Sideloadly (or AltStore / SideStore) signs it with a free
+# Apple ID while installing it on the phone.
+name: iPhone build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ios-app]
+
+jobs:
+  ipa:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build the pages
+        run: npm run build
+
+      - name: Create the Xcode project
+        run: |
+          npx tauri ios init --ci
+          npx tauri icon src-tauri/icons/icon.png
+
+      - name: Build the app (unsigned)
+        working-directory: src-tauri/gen/apple
+        run: |
+          PROJECT=$(ls -d *.xcodeproj | head -1)
+          xcodebuild -list -json -project "$PROJECT" > list.json
+          SCHEME=$(jq -r '.project.schemes[] | select(endswith("_iOS"))' list.json | head -1)
+          CONFIG=$(jq -r '.project.configurations[] | select(ascii_downcase == "release")' list.json | head -1)
+          echo "Project $PROJECT, scheme $SCHEME, configuration $CONFIG"
+          xcodebuild archive \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIG" \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Diary.xcarchive" \
+            ARCHS=arm64 \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+
+      - name: Pack Diary.ipa
+        run: |
+          APP=$(find "$RUNNER_TEMP/Diary.xcarchive/Products/Applications" -maxdepth 1 -name "*.app" | head -1)
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          cp -R "$APP" "$RUNNER_TEMP/ipa/Payload/"
+          (cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/Diary.ipa" Payload)
+          ls -lh Diary.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Diary-iPhone
+          path: Diary.ipa
+          retention-days: 30

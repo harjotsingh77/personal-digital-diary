@@ -71,7 +71,7 @@ export function TimelineView({ onOpen, focusSearch }: Props) {
     <div className="flex h-full flex-col">
       <header data-tauri-drag-region className="h-[52px] shrink-0" />
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[760px] px-10 pb-24">
+        <div className="mx-auto max-w-[760px] px-10 pb-24 max-sm:px-4">
           <div className="flex items-baseline justify-between">
             <h1 className="font-serif text-[30px] text-ink">Timeline</h1>
             <p className="text-sm text-muted">

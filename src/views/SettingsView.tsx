@@ -3,6 +3,7 @@ import { Bell, BookText, Palette, Check, Copy, Download, Fingerprint, FolderOpen
 import { api, errorMessage, type AutoBackupInfo, type ImportResult } from "../lib/api";
 import { addDays, todayISO } from "../lib/dates";
 import { printBook } from "../lib/printBook";
+import { biometricName, device, isIOS } from "../lib/platform";
 import {
   ACCENT_COLOURS, applyPageFont, DEFAULT_COLOURS, isDark, loadColours, PAGE_COLOURS, pageFont, saveColours,
   setTranscriptionLanguage, transcriptionLanguage, TRANSCRIPTION_LANGUAGES,
@@ -19,7 +20,7 @@ export function SettingsView({ onDataChanged }: Props) {
     <div className="flex h-full flex-col">
       <header data-tauri-drag-region className="h-[52px] shrink-0" />
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[640px] space-y-5 px-10 pb-24">
+        <div className="mx-auto max-w-[640px] space-y-5 px-10 pb-24 max-sm:px-4">
           <h1 className="font-serif text-[30px] text-ink">Settings</h1>
           <ColourSection />
           <PageSection />
@@ -29,7 +30,7 @@ export function SettingsView({ onDataChanged }: Props) {
           <RecoverySection />
           <BackupSection onDataChanged={onDataChanged} />
           <AutoBackupSection />
-          <BookSection />
+          {!isIOS && <BookSection />}
           <AboutSection />
         </div>
       </div>
@@ -73,6 +74,11 @@ function Message({ kind, text }: { kind: "ok" | "error"; text: string }) {
   );
 }
 
+/** On the iPhone, exports go to the app's folder in the Files app. */
+function savedWhere(path: string): string {
+  return isIOS ? `Files → On My ${device} → Diary (${path.split("/").pop()})` : path;
+}
+
 function SecuritySection() {
   const [bio, setBio] = useState<{ available: boolean; enabled: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -88,7 +94,7 @@ function SecuritySection() {
       if (bio.enabled) await api.disableTouchId();
       else await api.enableTouchId();
       setBio({ ...bio, enabled: !bio.enabled });
-      setMsg({ kind: "ok", text: bio.enabled ? "Touch ID turned off. The Keychain copy of your key was deleted." : "Touch ID is on." });
+      setMsg({ kind: "ok", text: bio.enabled ? `${biometricName} turned off. The Keychain copy of your key was deleted.` : `${biometricName} is on.` });
     } catch (e) {
       setMsg({ kind: "error", text: errorMessage(e) });
     } finally {
@@ -100,14 +106,14 @@ function SecuritySection() {
     <Card title="Security" icon={<Fingerprint size={17} />}>
       <div className="flex items-start justify-between gap-6">
         <div>
-          <p className="text-[14px] text-ink">Unlock with Touch ID</p>
+          <p className="text-[14px] text-ink">Unlock with {biometricName}</p>
           <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
             {bio && !bio.available
-              ? "Touch ID isn't available on this Mac (or no fingerprint is enrolled)."
-              : "Keeps a copy of your diary key in your macOS login Keychain, released only after a fingerprint check. Convenient, but it means your Mac account can open the diary, not just your diary password."}
+              ? `${biometricName} isn't available on this ${device} (or isn't set up).`
+              : `Keeps a copy of your diary key in your ${device}'s Keychain, released only after a ${biometricName} check. Convenient, but it means anyone who can pass ${biometricName} on this ${device} can open the diary, not just your diary password.`}
           </p>
         </div>
-        <Toggle on={!!bio?.enabled} disabled={!bio?.available || busy} onClick={toggle} label="Unlock with Touch ID" />
+        <Toggle on={!!bio?.enabled} disabled={!bio?.available || busy} onClick={toggle} label={`Unlock with ${biometricName}`} />
       </div>
       <div className="mt-4 border-t border-line pt-4 text-[12.5px] leading-relaxed text-muted">
         The diary locks itself after <span className="text-ink">5 minutes</span> without activity. Press{" "}
@@ -187,7 +193,7 @@ function ColourSection() {
     saveColours(next);
   };
   const dark = isDark(colours.mode);
-  const modes: [ThemeMode, string][] = [["system", "Same as Mac"], ["light", "Light"], ["dark", "Dark"]];
+  const modes: [ThemeMode, string][] = [["system", `Same as ${device}`], ["light", "Light"], ["dark", "Dark"]];
   const isDefault = colours.mode === DEFAULT_COLOURS.mode && colours.page === DEFAULT_COLOURS.page && colours.accent === DEFAULT_COLOURS.accent;
 
   return (
@@ -287,7 +293,7 @@ function PageSection() {
           </select>
         </div>
         <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted">
-          "Turn into text" runs on this Mac, and never uses the network. While it works, the note's audio is briefly unencrypted in the diary's folder, then deleted.
+          "Turn into text" runs on this {device}, and never uses the network. While it works, the note's audio is briefly unencrypted in the diary's folder, then deleted.
         </p>
       </div>
     </Card>
@@ -357,7 +363,7 @@ function RecoverySection() {
       <p className="text-[12.5px] leading-relaxed text-muted">
         {has
           ? "You have a recovery key. Making a new one stops the old one from working."
-          : "You don't have a recovery key, so a forgotten password would lose your diary for good. Make one and keep it away from this Mac."}
+          : `You don't have a recovery key, so a forgotten password would lose your diary for good. Make one and keep it away from this ${device}.`}
       </p>
       {key ? (
         <div className="mt-3 animate-fade-in">
@@ -395,7 +401,7 @@ function BackupSection({ onDataChanged }: { onDataChanged: () => void }) {
     setBusy("export"); setMsg(null);
     try {
       const path = await api.exportEncryptedBackup(todayISO(), password, includeVideos);
-      if (path) { setMsg({ kind: "ok", text: `Encrypted backup saved to ${path}` }); setPassword(""); }
+      if (path) { setMsg({ kind: "ok", text: `Encrypted backup saved to ${savedWhere(path)}` }); setPassword(""); }
     } catch (e) {
       setMsg({ kind: "error", text: errorMessage(e) });
     } finally {
@@ -407,7 +413,7 @@ function BackupSection({ onDataChanged }: { onDataChanged: () => void }) {
     setBusy("plain"); setMsg(null);
     try {
       const path = await api.exportBackup(todayISO());
-      if (path) setMsg({ kind: "ok", text: `Unencrypted backup saved to ${path}. It doesn't include videos.` });
+      if (path) setMsg({ kind: "ok", text: `Unencrypted backup saved to ${savedWhere(path)}. It doesn't include videos.` });
     } catch (e) {
       setMsg({ kind: "error", text: errorMessage(e) });
     } finally {
@@ -553,7 +559,9 @@ function AutoBackupSection() {
       ) : (
         <form onSubmit={enable}>
           <p className="text-[12.5px] leading-relaxed text-muted">
-            Keeps encrypted copies in a folder you choose, like an external drive. Backups only run while the diary is unlocked.
+            {isIOS
+              ? "Keeps encrypted copies in the Files app, under On My iPhone → Diary → Backups. Backups only run while the diary is unlocked."
+              : "Keeps encrypted copies in a folder you choose, like an external drive. Backups only run while the diary is unlocked."}
           </p>
           <input type="password" autoComplete="new-password" placeholder="Password for these backups" value={password} onChange={(e) => setPassword(e.target.value)} className={`${fieldClass} mt-3`} aria-label="Password for these backups" />
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] text-ink">
@@ -570,7 +578,7 @@ function AutoBackupSection() {
               Include videos
             </label>
           </div>
-          <div className="mt-3"><Button type="submit" busy={busy} disabled={password.length < 6}><FolderOpen size={14} /> Choose folder…</Button></div>
+          <div className="mt-3"><Button type="submit" busy={busy} disabled={password.length < 6}><FolderOpen size={14} /> {isIOS ? "Turn on" : "Choose folder…"}</Button></div>
         </form>
       )}
       {msg && <Message {...msg} />}
@@ -620,7 +628,7 @@ function AboutSection() {
   return (
     <Card title="Your data" icon={<FolderOpen size={17} />}>
       <p className="text-[12.5px] leading-relaxed text-muted">
-        Everything stays on this Mac. Nothing is sent anywhere: no cloud, no analytics, no network. Entries, photos, voice and video notes are encrypted with AES-256-GCM using a key derived from your password (Argon2id).
+        Everything stays on this {device}. Nothing is sent anywhere: no cloud, no analytics, no network. Entries, photos, voice and video notes are encrypted with AES-256-GCM using a key derived from your password (Argon2id).
       </p>
       <button
         onClick={() => { navigator.clipboard.writeText(path).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }}
@@ -629,6 +637,7 @@ function AboutSection() {
       >
         {copied ? "Copied ✓" : path}
       </button>
+      {!isIOS && (
       <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-1.5 border-t border-line pt-4 text-[12.5px] text-muted">
         {[
           ["⌘N", "Write today"], ["⌘F", "Search"], ["⌘L", "Lock"], ["⌘1–7", "Switch view"], ["⌘[ / ⌘]", "Turn page"],
@@ -637,6 +646,7 @@ function AboutSection() {
           <div key={k} className="flex justify-between"><span>{v}</span><kbd className="text-ink/70">{k}</kbd></div>
         ))}
       </div>
+      )}
     </Card>
   );
 }

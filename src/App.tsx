@@ -93,9 +93,9 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-full animate-fade-in">
+    <div className="flex h-full animate-fade-in max-sm:flex-col-reverse">
       <Sidebar view={view} onChange={setView} onLock={lock} stats={stats} />
-      <main className="relative flex-1 overflow-hidden bg-paper">
+      <main className="relative min-h-0 flex-1 overflow-hidden bg-paper max-sm:pt-[env(safe-area-inset-top)]">
         <div key={view} className="h-full animate-rise">
           {view === "write" && <WriteView date={date} onDateChange={setDate} onSaved={refreshStats} />}
           {view === "calendar" && <CalendarView initialMonth={monthOf(date)} onOpen={openDate} />}

@@ -50,7 +50,7 @@ export function MoodView({ onOpen }: Props) {
       </header>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[820px] px-10 pb-20">
+        <div className="mx-auto max-w-[820px] px-10 pb-20 max-sm:px-4">
           <h1 className="font-serif text-[30px] text-ink">Mood</h1>
           <p className="mt-1 text-sm text-muted">{formatMonth(month)}</p>
 

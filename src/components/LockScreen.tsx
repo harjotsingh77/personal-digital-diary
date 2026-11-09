@@ -1,3 +1,4 @@
+import { biometricName, device } from "../lib/platform";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Check, Copy, Fingerprint, LoaderCircle } from "lucide-react";
 import { api, errorMessage } from "../lib/api";
@@ -186,7 +187,7 @@ export function LockScreen({ mode, touchId, hasRecovery, onUnlocked }: Props) {
             className="mt-2 flex w-full items-center justify-center gap-2 rounded-md px-4 py-2.5 text-[13.5px] text-[#efe3d0] transition hover:bg-white/5 disabled:opacity-60"
           >
             <Fingerprint size={16} />
-            Use Touch ID
+            Use {biometricName}
           </button>
         )}
 
@@ -210,10 +211,10 @@ export function RecoveryKeyShown({ recoveryKey, onDone }: { recoveryKey: string;
   const [copied, setCopied] = useState(false);
   return (
     <div className="desk flex h-full items-center justify-center p-6">
-      <div className="w-[460px] animate-rise rounded-md bg-[var(--page)] p-8 shadow-[0_24px_50px_-16px_var(--shadow)]">
+      <div className="w-[460px] max-w-[calc(100vw-32px)] animate-rise rounded-md bg-[var(--page)] p-8 shadow-[0_24px_50px_-16px_var(--shadow)]">
         <h1 className="font-hand text-[26px] text-ink">Your recovery key</h1>
         <p className="mt-2 text-[13.5px] leading-relaxed text-muted">
-          If you ever forget your password, this is the only way back in. Write it down and keep it away from this Mac. It won't be shown again.
+          If you ever forget your password, this is the only way back in. Write it down and keep it away from this {device}. It won't be shown again.
         </p>
         <p className="mt-5 select-text break-words rounded-md border border-line bg-surface p-4 text-center font-mono text-[14px] leading-relaxed text-ink [user-select:text]">{recoveryKey}</p>
         <button

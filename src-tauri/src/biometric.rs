@@ -15,7 +15,7 @@ use crate::error::{AppError, AppResult};
 const SERVICE: &str = "com.harjotsingh.diary";
 const ACCOUNT: &str = "touch-id-data-key";
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 mod imp {
     use super::*;
     use block2::RcBlock;
@@ -74,7 +74,7 @@ mod imp {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
 mod imp {
     use super::*;
     pub fn available() -> bool { false }

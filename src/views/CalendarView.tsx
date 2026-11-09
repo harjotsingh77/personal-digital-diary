@@ -57,7 +57,7 @@ export function CalendarView({ initialMonth, onOpen }: Props) {
         <NavButton label="Next month" onClick={() => setMonth(addMonths(month, 1))} disabled={month >= thisMonth}><ChevronRight size={17} /></NavButton>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col px-10 pb-8">
+      <div className="flex min-h-0 flex-1 flex-col px-10 pb-8 max-sm:px-3 max-sm:pb-3">
         <div className="mb-5 flex items-baseline justify-between">
           <h1 className="font-serif text-[30px] text-ink">{formatMonth(month)}</h1>
           <p className="text-sm text-muted">

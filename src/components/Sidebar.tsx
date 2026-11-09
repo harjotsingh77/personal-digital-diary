@@ -20,15 +20,15 @@ interface Props {
   stats: Stats | null;
 }
 
-/** A slim rail, so the book gets the room. */
+/** A slim rail, so the book gets the room. On a phone it becomes a tab bar along the bottom. */
 export function Sidebar({ view, onChange, onLock, stats }: Props) {
   const railButton = "flex size-10 items-center justify-center rounded-lg transition-colors active:scale-95";
   return (
-    <aside className="flex w-[76px] shrink-0 flex-col items-center bg-sidebar">
+    <aside className="flex w-[76px] shrink-0 flex-col items-center bg-sidebar max-sm:w-full max-sm:flex-row max-sm:justify-around max-sm:px-1 max-sm:pt-1 max-sm:pb-[max(env(safe-area-inset-bottom),4px)]">
       {/* Space for the macOS traffic lights; doubles as a drag handle. */}
-      <div data-tauri-drag-region className="h-[52px] w-full shrink-0" />
+      <div data-tauri-drag-region className="h-[52px] w-full shrink-0 max-sm:hidden" />
 
-      <nav className="flex flex-1 flex-col items-center gap-1">
+      <nav className="flex flex-1 flex-col items-center gap-1 max-sm:flex-row max-sm:justify-around max-sm:gap-0">
         {NAV.map(({ id, label, icon: Icon }, i) => {
           const active = id === view;
           return (
@@ -46,10 +46,10 @@ export function Sidebar({ view, onChange, onLock, stats }: Props) {
         })}
       </nav>
 
-      <div className="flex flex-col items-center gap-2 pb-3">
+      <div className="flex flex-col items-center gap-2 pb-3 max-sm:pb-0">
         {stats && stats.currentStreak > 0 && (
           <div
-            className="flex animate-fade-in items-center gap-1 text-[12px] tabular-nums text-muted"
+            className="flex animate-fade-in items-center gap-1 text-[12px] tabular-nums text-muted max-sm:hidden"
             title={`${stats.currentStreak}-day streak · longest ${stats.longestStreak} · ${stats.totalEntries} ${stats.totalEntries === 1 ? "page" : "pages"} written`}
           >
             <Flame size={13} className={stats.writtenToday ? "text-accent" : ""} />

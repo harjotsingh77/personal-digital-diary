@@ -258,7 +258,7 @@ export function WriteView({ date, onDateChange, onSaved }: Props) {
   return (
     <div className="desk flex h-full flex-col">
       {/* Doubles as the window drag area. */}
-      <header data-tauri-drag-region className="flex h-[44px] shrink-0 items-center justify-end gap-3 px-6">
+      <header data-tauri-drag-region className="flex h-[44px] shrink-0 items-center justify-end gap-3 px-6 max-sm:h-[38px] max-sm:px-3">
         {date !== today && (
           <button
             onClick={() => onDateChange(today)}
@@ -270,7 +270,7 @@ export function WriteView({ date, onDateChange, onSaved }: Props) {
         <SaveIndicator status={status} />
       </header>
 
-      <div className="relative flex min-h-0 flex-1 items-stretch justify-center px-7 pb-7">
+      <div className="relative flex min-h-0 flex-1 items-stretch justify-center px-7 pb-7 max-sm:px-2 max-sm:pb-2">
         <div className="book" style={{ containerType: "inline-size" }}>
           <div className="book-spread">
             {/* Left page: the day before, to read. */}

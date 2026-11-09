@@ -21,23 +21,58 @@ fn io(e: std::io::Error) -> AppError {
     AppError::Internal(e.to_string())
 }
 
+/// Where to write an export. On the Mac, a save dialog. The iPhone's save
+/// dialog only hands back a file the app can't write to later, so there the
+/// file goes in the app's Documents folder, which the Files app shows under
+/// On My iPhone → Diary.
+fn save_location(app: &AppHandle, title: &str, name: String, filter: &str, ext: &str) -> AppResult<Option<std::path::PathBuf>> {
+    #[cfg(target_os = "ios")]
+    {
+        let _ = (title, filter, ext);
+        Ok(Some(documents_dir(app)?.join(name)))
+    }
+    #[cfg(not(target_os = "ios"))]
+    {
+        let Some(path) = app.dialog().file().set_title(title).set_file_name(name).add_filter(filter, &[ext]).blocking_save_file() else {
+            return Ok(None);
+        };
+        path.into_path().map(Some).map_err(|e| AppError::Internal(e.to_string()))
+    }
+}
+
+/// The folder for automatic backups: chosen by the user on the Mac, and a
+/// Backups folder in the Files app on the iPhone, which has no folder picker.
+fn backup_folder(app: &AppHandle) -> AppResult<Option<std::path::PathBuf>> {
+    #[cfg(target_os = "ios")]
+    {
+        let folder = documents_dir(app)?.join("Backups");
+        std::fs::create_dir_all(&folder).map_err(io)?;
+        Ok(Some(folder))
+    }
+    #[cfg(not(target_os = "ios"))]
+    {
+        let Some(folder) = app.dialog().file().set_title("Choose a folder for backups").blocking_pick_folder() else {
+            return Ok(None);
+        };
+        folder.into_path().map(Some).map_err(|e| AppError::Internal(e.to_string()))
+    }
+}
+
+#[cfg(target_os = "ios")]
+fn documents_dir(app: &AppHandle) -> AppResult<std::path::PathBuf> {
+    use tauri::Manager;
+    app.path().document_dir().map_err(|e| AppError::Internal(e.to_string()))
+}
+
 /// Ask where to save, then write the JSON backup. Returns the saved path,
 /// or `None` if the user cancelled.
 #[tauri::command]
 pub async fn export_backup(app: AppHandle, state: State<'_, AppState>, today: String) -> AppResult<Option<String>> {
     entries::validate_date(&today)?;
     let key = state.key()?;
-    let Some(path) = app
-        .dialog()
-        .file()
-        .set_title("Export diary backup")
-        .set_file_name(format!("diary-backup-{today}.json"))
-        .add_filter("JSON", &["json"])
-        .blocking_save_file()
-    else {
+    let Some(path) = save_location(&app, "Export diary backup", format!("diary-backup-{today}.json"), "JSON", "json")? else {
         return Ok(None);
     };
-    let path = path.into_path().map_err(|e| AppError::Internal(e.to_string()))?;
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
     let json = backup::export(&state.db.lock().unwrap(), &key, &state.data_dir, now)?;
     std::fs::write(&path, json).map_err(io)?;
@@ -60,17 +95,9 @@ pub async fn export_encrypted_backup(
         return Err(AppError::Invalid(format!("Use at least {MIN_BACKUP_PASSWORD_LEN} characters for the backup password")));
     }
     let key = state.key()?;
-    let Some(path) = app
-        .dialog()
-        .file()
-        .set_title("Save encrypted backup")
-        .set_file_name(format!("diary-backup-{today}.diarybackup"))
-        .add_filter("Diary backup", &["diarybackup"])
-        .blocking_save_file()
-    else {
+    let Some(path) = save_location(&app, "Save encrypted backup", format!("diary-backup-{today}.diarybackup"), "Diary backup", "diarybackup")? else {
         return Ok(None);
     };
-    let path = path.into_path().map_err(|e| AppError::Internal(e.to_string()))?;
     let snapshot = backup::snapshot(&state.db.lock().unwrap(), &key)?;
     let salt = crypto::random_bytes::<16>();
     let backup_key = crypto::derive_kek(&password, &salt)?;
@@ -148,10 +175,9 @@ pub async fn enable_auto_backup(
         return Err(AppError::Invalid(format!("Use at least {MIN_BACKUP_PASSWORD_LEN} characters for the backup password")));
     }
     let key = state.key()?;
-    let Some(folder) = app.dialog().file().set_title("Choose a folder for backups").blocking_pick_folder() else {
+    let Some(folder) = backup_folder(&app)? else {
         return Ok(false);
     };
-    let folder = folder.into_path().map_err(|e| AppError::Internal(e.to_string()))?;
     let config = auto_backup::new_config(folder, &password, every_days, include_videos)?;
     auto_backup::save(&state.db.lock().unwrap(), &key, &config)?;
     Ok(true)
@@ -179,19 +205,20 @@ pub fn get_reminder(state: State<'_, AppState>) -> AppResult<Option<String>> {
     Ok(stored.map(|v| String::from_utf8_lossy(&v).into_owned()))
 }
 
+/// Async so it runs off the main thread: on the iPhone, asking for the
+/// notification permission waits on the main thread.
 #[tauri::command]
-pub fn set_reminder(state: State<'_, AppState>, time: Option<String>) -> AppResult<()> {
+pub async fn set_reminder(app: AppHandle, state: State<'_, AppState>, time: Option<String>) -> AppResult<()> {
     state.key()?;
-    let conn = state.db.lock().unwrap();
     match time {
         Some(time) => {
             let (hour, minute) = reminder::parse_time(&time)?;
-            reminder::install(hour, minute)?;
-            db::set_meta(&conn, "reminder", time.as_bytes())?;
+            reminder::install(&app, hour, minute)?;
+            db::set_meta(&state.db.lock().unwrap(), "reminder", time.as_bytes())?;
         }
         None => {
-            reminder::uninstall()?;
-            conn.execute("DELETE FROM meta WHERE key = 'reminder'", [])?;
+            reminder::uninstall(&app)?;
+            state.db.lock().unwrap().execute("DELETE FROM meta WHERE key = 'reminder'", [])?;
         }
     }
     Ok(())

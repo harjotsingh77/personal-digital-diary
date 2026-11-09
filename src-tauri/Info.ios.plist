@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Merged into the generated iPhone Info.plist by `tauri ios`. -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>Face ID unlocks your diary without typing your password.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>The camera records video notes on your diary pages.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>The microphone records voice and video notes on your diary pages.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Turns your voice notes into text on this iPhone, so search can find them.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Lets you add photos to your diary pages.</string>
+	<!-- Backups and exports land in Files → On My iPhone → Diary. -->
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+</dict>
+</plist>

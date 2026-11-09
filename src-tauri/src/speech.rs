@@ -10,7 +10,7 @@ use std::path::Path;
 
 use crate::error::{AppError, AppResult};
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 mod imp {
     use super::*;
     use block2::RcBlock;
@@ -35,7 +35,11 @@ mod imp {
         match rx.recv_timeout(Duration::from_secs(120)) {
             Ok(SFSpeechRecognizerAuthorizationStatus::Authorized) => Ok(()),
             _ => Err(AppError::Invalid(
-                "Speech recognition is off. Allow Diary in System Settings → Privacy & Security → Speech Recognition.".into(),
+                if cfg!(target_os = "ios") {
+                    "Speech recognition is off. Allow it for Diary in Settings → Privacy & Security → Speech Recognition.".into()
+                } else {
+                    "Speech recognition is off. Allow Diary in System Settings → Privacy & Security → Speech Recognition.".into()
+                },
             )),
         }
     }
@@ -48,10 +52,11 @@ mod imp {
         let _task = unsafe {
             let locale = NSLocale::localeWithLocaleIdentifier(&NSString::from_str(language));
             let recognizer = SFSpeechRecognizer::initWithLocale(SFSpeechRecognizer::alloc(), &locale)
-                .ok_or_else(|| AppError::Invalid(format!("This Mac can't recognise {language}")))?;
+                .ok_or_else(|| AppError::Invalid(format!("This device can't recognise {language}")))?;
             if !recognizer.supportsOnDeviceRecognition() {
+                let place = if cfg!(target_os = "ios") { "Settings → General → Keyboard" } else { "System Settings → Keyboard" };
                 return Err(AppError::Invalid(format!(
-                    "No on-device speech model for {language}. Turn on Dictation for it in System Settings → Keyboard, then try again."
+                    "No on-device speech model for {language}. Turn on Dictation for it in {place}, then try again."
                 )));
             }
             let url = NSURL::fileURLWithPath(&NSString::from_str(path));
@@ -76,7 +81,7 @@ mod imp {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
 mod imp {
     use super::*;
     pub fn recognize(_: &Path, _: &str) -> AppResult<String> {

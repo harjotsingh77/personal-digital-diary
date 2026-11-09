@@ -75,8 +75,10 @@ mod tests {
 }
 
 pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init())
+    let builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init());
+    #[cfg(target_os = "ios")]
+    let builder = builder.plugin(tauri_plugin_notification::init());
+    builder
         // Plays encrypted videos: decrypts just the byte ranges the player asks for.
         .register_asynchronous_uri_scheme_protocol("diaryvideo", |ctx, request, responder| {
             let app = ctx.app_handle().clone();

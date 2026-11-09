@@ -55,7 +55,7 @@ export function YearView({ onOpen }: { onOpen: (date: string) => void }) {
         <YearButton label="Next year" disabled={year >= thisYear} onClick={() => setYear(year + 1)}><ChevronRight size={17} /></YearButton>
       </header>
       <div className="flex-1 overflow-y-auto">
-        <div className={`mx-auto max-w-[880px] px-10 pb-20 transition-opacity duration-200 ${all ? "opacity-100" : "opacity-0"}`}>
+        <div className={`mx-auto max-w-[880px] px-10 pb-20 max-sm:px-4 transition-opacity duration-200 ${all ? "opacity-100" : "opacity-0"}`}>
           <h1 className="font-serif text-[30px] tabular-nums text-ink">{year}</h1>
           <p className="mt-1 text-sm text-muted">
             {entries.length ? `You wrote on ${entries.length} ${entries.length === 1 ? "day" : "days"}.` : "Nothing written this year yet."}
