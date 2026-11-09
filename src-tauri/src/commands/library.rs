@@ -147,5 +147,12 @@ pub async fn transcribe_voice_note(state: State<'_, AppState>, id: String, langu
 /// Opens the system print dialog, whose PDF menu saves the book as a file.
 #[tauri::command]
 pub fn print_page(window: tauri::WebviewWindow) -> AppResult<()> {
-    window.print().map_err(|e| AppError::Internal(e.to_string()))
+    #[cfg(desktop)]
+    return window.print().map_err(|e| AppError::Internal(e.to_string()));
+    // Phones have no print window; the Settings card is hidden there.
+    #[cfg(mobile)]
+    {
+        let _ = window;
+        Err(AppError::Invalid("Making a book isn't available on this device".into()))
+    }
 }
