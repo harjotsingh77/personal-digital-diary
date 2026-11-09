@@ -31,7 +31,7 @@ fn video_response(state: &state::AppState, request: &Request<Vec<u8>>) -> Respon
     let Ok(total) = video::size(&state.data_dir, id) else { return status_only(StatusCode::NOT_FOUND) };
     let range = request.headers().get("range").and_then(|v| v.to_str().ok()).unwrap_or("");
     let (start, end) = parse_range(range, total);
-    if start >= total {
+    if start >= end {
         return Response::builder()
             .status(StatusCode::RANGE_NOT_SATISFIABLE)
             .header("Content-Range", format!("bytes */{total}"))
@@ -51,12 +51,21 @@ fn video_response(state: &state::AppState, request: &Request<Vec<u8>>) -> Respon
         .unwrap()
 }
 
-/// `bytes=a-b` as a half-open range capped at `VIDEO_CHUNK`. No header starts at 0.
+/// `bytes=a-b` (or the suffix form `bytes=-n`, the last n bytes) as a
+/// half-open range capped at `VIDEO_CHUNK`. No header starts at 0. An empty
+/// result (start >= end) means the range can't be satisfied.
 fn parse_range(header: &str, total: u64) -> (u64, u64) {
-    let spec = header.strip_prefix("bytes=").unwrap_or("0-");
+    let spec = header.trim().strip_prefix("bytes=").unwrap_or("0-");
+    // Only the first range of a multi-range request is served.
+    let spec = spec.split(',').next().unwrap_or("0-").trim();
     let (a, b) = spec.split_once('-').unwrap_or(("0", ""));
-    let start = a.parse().unwrap_or(0);
-    let wanted_end = b.parse::<u64>().map_or(total, |b| b.saturating_add(1));
+    let (start, wanted_end) = if a.is_empty() {
+        let last = b.parse::<u64>().unwrap_or(0);
+        (total.saturating_sub(last), total)
+    } else {
+        let Ok(start) = a.parse::<u64>() else { return (0, 0) };
+        (start, b.parse::<u64>().map_or(total, |b| b.saturating_add(1)))
+    };
     (start, wanted_end.min(total).min(start.saturating_add(VIDEO_CHUNK)))
 }
 
@@ -71,9 +80,19 @@ mod tests {
         assert_eq!(parse_range("", 100), (0, 100));
         assert_eq!(parse_range("bytes=0-", u64::MAX), (0, 4 * 1024 * 1024));
         assert_eq!(parse_range("bytes=90-500", 100), (90, 100));
+        // Suffix ranges ask for the last n bytes.
+        assert_eq!(parse_range("bytes=-10", 100), (90, 100));
+        assert_eq!(parse_range("bytes=-500", 100), (0, 100));
+        // Backwards or garbled ranges come out empty, so they get a 416.
+        let (a, b) = parse_range("bytes=50-10", 100);
+        assert!(a >= b);
+        let (a, b) = parse_range("bytes=x-10", 100);
+        assert!(a >= b);
+        assert_eq!(parse_range("bytes=0-1, 5-9", 100), (0, 2));
     }
 }
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init());
     #[cfg(target_os = "ios")]

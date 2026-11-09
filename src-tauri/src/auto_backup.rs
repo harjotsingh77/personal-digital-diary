@@ -155,10 +155,15 @@ fn run(state: &AppState, key: &Key, mut config: Config, today: &str) -> AppResul
         }
         Err(e) => config.last_error = Some(e.to_string()),
     }
-    // The user may have turned it off while this ran; don't bring it back.
+    // The user may have turned it off, or set it up again with another folder
+    // or password, while this ran. Only record the outcome on the same setup.
     let conn = state.db.lock().unwrap();
-    if db::get_meta(&conn, META_KEY)?.is_some() {
-        save(&conn, key, &config)?;
+    if let Some(mut current) = load(&conn, key)? {
+        if current.salt == config.salt && current.folder == config.folder {
+            current.last_run = config.last_run;
+            current.last_error = config.last_error;
+            save(&conn, key, &current)?;
+        }
     }
     result
 }

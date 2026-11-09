@@ -56,9 +56,14 @@ fn seal_dek(password: &str, dek: &Key) -> AppResult<(String, [u8; 16], Vec<u8>)>
     Ok((phc, salt, wrapped))
 }
 
-fn store_sealed(state: &AppState, phc: &str, salt: &[u8], wrapped: &[u8]) -> AppResult<()> {
+/// `first` refuses to replace an existing password (first-time setup), checked
+/// in the same transaction so two setups racing can't both win.
+fn store_sealed(state: &AppState, phc: &str, salt: &[u8], wrapped: &[u8], first: bool) -> AppResult<()> {
     let mut conn = state.db.lock().unwrap();
     let tx = conn.transaction()?;
+    if first && db::get_meta(&tx, "password_hash")?.is_some() {
+        return Err(AppError::Invalid("A password is already set".into()));
+    }
     db::set_meta(&tx, "password_hash", phc.as_bytes())?;
     db::set_meta(&tx, "kdf_salt", salt)?;
     db::set_meta(&tx, "wrapped_dek", wrapped)?;
@@ -116,7 +121,7 @@ pub async fn setup_password(state: State<'_, AppState>, password: String) -> App
     let dek = crypto::random_key();
     let dek_for_seal = dek.clone();
     let (phc, salt, wrapped) = blocking(move || seal_dek(&password, &dek_for_seal)).await?;
-    store_sealed(&state, &phc, &salt, &wrapped)?;
+    store_sealed(&state, &phc, &salt, &wrapped, true)?;
     *state.key.lock().unwrap() = Some(dek);
     Ok(())
 }
@@ -133,8 +138,10 @@ pub async fn unlock(state: State<'_, AppState>, password: String) -> AppResult<(
 pub fn lock(state: State<'_, AppState>) {
     // A voice note deleted with Backspace keeps its file so ⌘Z can bring it
     // back. That undo history is gone once the diary locks, so tidy up now.
-    // Skipped (never guessed) if any entry fails to decrypt.
-    if let Ok(key) = state.key() {
+    // Skipped (never guessed) if any entry fails to decrypt, and while a
+    // backup import is running: its files arrive before the entries that
+    // refer to them, so they would look unused and be deleted.
+    if let (Ok(key), false) = (state.key(), state.import_running()) {
         if let Ok(keep) = entries::voice_note_ids(&state.db.lock().unwrap(), &key) {
             let _ = attachments::prune(&state.data_dir, Kind::Voice, &keep);
         }
@@ -164,7 +171,7 @@ pub async fn change_password(
     }
     let dek = open_dek(&state, Zeroizing::new(current)).await?;
     let (phc, salt, wrapped) = blocking(move || seal_dek(&new_password, &dek)).await?;
-    store_sealed(&state, &phc, &salt, &wrapped)?;
+    store_sealed(&state, &phc, &salt, &wrapped, false)?;
     Ok(())
 }
 
@@ -207,7 +214,7 @@ pub async fn recover_with_key(state: State<'_, AppState>, recovery_key: String, 
     let dek: Key = Zeroizing::new(raw);
     let dek_for_seal = dek.clone();
     let (phc, salt, sealed) = blocking(move || seal_dek(&new_password, &dek_for_seal)).await?;
-    store_sealed(&state, &phc, &salt, &sealed)?;
+    store_sealed(&state, &phc, &salt, &sealed, false)?;
     *state.key.lock().unwrap() = Some(dek);
     Ok(())
 }

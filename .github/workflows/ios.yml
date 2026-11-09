@@ -39,6 +39,22 @@ jobs:
           npx tauri ios init --ci
           npx tauri icon src-tauri/icons/icon.png
 
+      # Xcode's own "Build Rust Code" step only works while `tauri ios build`
+      # is running, and that command insists on signing. So build the Rust
+      # library here, hand it to Xcode where it looks for it, and turn that
+      # step off.
+      - name: Build the Rust library
+        working-directory: src-tauri
+        env:
+          IPHONEOS_DEPLOYMENT_TARGET: "14.0"
+        run: |
+          cargo build --release --lib --target aarch64-apple-ios --features tauri/custom-protocol
+          mkdir -p gen/apple/Externals/arm64/release
+          cp target/aarch64-apple-ios/release/libdiary_lib.a gen/apple/Externals/arm64/release/libapp.a
+          PBX=$(ls -d gen/apple/*.xcodeproj)/project.pbxproj
+          perl -pi -e 's/shellScript = "[^\n]*tauri ios xcode-script[^\n]*";/shellScript = "true";/' "$PBX"
+          if grep -q "xcode-script" "$PBX"; then echo "Couldn't turn off Xcode's Rust step"; exit 1; fi
+
       - name: Build the app (unsigned)
         working-directory: src-tauri/gen/apple
         run: |

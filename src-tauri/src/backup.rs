@@ -275,6 +275,9 @@ pub fn import_sealed<R: Read>(conn: &std::sync::Mutex<Connection>, key: &Key, da
     let len = read_u64(&mut r).map_err(damaged)?;
     let mut json = vec![];
     r.by_ref().take(len).read_to_end(&mut json).map_err(damaged)?;
+    if json.len() as u64 != len {
+        return Err(AppError::Invalid("Wrong backup password, or the file is damaged".into()));
+    }
     let backup: Backup = serde_json::from_slice(&json)
         .map_err(|e| AppError::Invalid(format!("This doesn't look like a diary backup ({e})")))?;
     if backup.version > VERSION {
@@ -298,6 +301,9 @@ pub fn import_sealed<R: Read>(conn: &std::sync::Mutex<Connection>, key: &Key, da
             record::PHOTO | record::VOICE => {
                 let mut bytes = vec![];
                 r.by_ref().take(len).read_to_end(&mut bytes).map_err(damaged)?;
+                if bytes.len() as u64 != len {
+                    return Err(AppError::Invalid("Wrong backup password, or the file is damaged".into()));
+                }
                 let kind = if tag[0] == record::PHOTO { Kind::Photo } else { Kind::Voice };
                 attachments::put(data_dir, key, kind, &id, &bytes)?;
             }

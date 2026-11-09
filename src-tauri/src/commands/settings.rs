@@ -110,6 +110,7 @@ pub async fn export_encrypted_backup(
 pub async fn import_encrypted_backup(state: State<'_, AppState>, path: String, password: String) -> AppResult<ImportResult> {
     let password = Zeroizing::new(password);
     let key = state.key()?;
+    let _importing = state.begin_import();
     let file = std::io::BufReader::new(std::fs::File::open(&path).map_err(io)?);
     let reader = backup::open_sealed(file, &password)
         .map_err(|_| AppError::Invalid("Wrong backup password, or the file is damaged".into()))?;
@@ -147,6 +148,7 @@ pub async fn import_backup(app: AppHandle, state: State<'_, AppState>) -> AppRes
         return Ok(Some(ImportOutcome { result: None, needs_password: Some(path.display().to_string()) }));
     }
     let json = std::fs::read(&path).map_err(io)?;
+    let _importing = state.begin_import();
     let result = backup::import(&mut state.db.lock().unwrap(), &key, &state.data_dir, &json)?;
     Ok(Some(ImportOutcome { result: Some(result), needs_password: None }))
 }

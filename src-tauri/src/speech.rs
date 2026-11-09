@@ -14,6 +14,7 @@ use crate::error::{AppError, AppResult};
 mod imp {
     use super::*;
     use block2::RcBlock;
+    use objc2::runtime::NSObjectProtocol;
     use objc2::AnyThread;
     use objc2_foundation::{NSError, NSLocale, NSString, NSURL};
     use objc2_speech::{
@@ -63,7 +64,11 @@ mod imp {
             let request = SFSpeechURLRecognitionRequest::initWithURL(SFSpeechURLRecognitionRequest::alloc(), &url);
             request.setRequiresOnDeviceRecognition(true);
             request.setShouldReportPartialResults(false);
-            request.setAddsPunctuation(true);
+            // Only on macOS 13 / iOS 16 and later; calling it on older systems
+            // would crash with an unrecognised selector.
+            if request.respondsToSelector(objc2::sel!(setAddsPunctuation:)) {
+                request.setAddsPunctuation(true);
+            }
             let handler = RcBlock::new(move |result: *mut SFSpeechRecognitionResult, error: *mut NSError| {
                 if !error.is_null() {
                     let _ = tx.send(Err(AppError::Invalid(

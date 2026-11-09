@@ -83,13 +83,23 @@ export function WriteView({ date, onDateChange, onSaved }: Props) {
   const draft = useRef<EntryPayload>(emptyPayload());
   const dateRef = useRef(rightDate);
   dateRef.current = rightDate;
+  /**
+   * The day whose entry is in the editor, or null while the next one loads
+   * (or failed to). Edits only save to this day: while a page is turning the
+   * editor still holds the previous day, and typing then must not be saved
+   * onto the new one.
+   */
+  const editingDate = useRef<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   /** Whether the text has had a cursor in it since this day was opened. */
   const hadCursor = useRef(false);
 
   const update = useCallback(
     (patch: Partial<EntryPayload>) => {
+      if (editingDate.current === null) return;
       draft.current = { ...draft.current, ...patch };
-      schedule(dateRef.current, draft.current);
+      schedule(editingDate.current, draft.current);
     },
     [schedule],
   );
@@ -156,10 +166,25 @@ export function WriteView({ date, onDateChange, onSaved }: Props) {
   useEffect(() => {
     if (!editor) return;
     let cancelled = false;
+    editingDate.current = null;
     (async () => {
       await flush();
-      const entry = await api.getEntry(rightDate).catch(() => null);
+      let entry: Entry | null;
+      try {
+        entry = await api.getEntry(rightDate);
+      } catch (e) {
+        if (cancelled) return;
+        // Showing an empty page here would let the next keystroke save over
+        // the real entry, so the page stays closed until it can be read.
+        setLoadError(errorMessage(e));
+        editor.setEditable(false);
+        editor.commands.setContent("", { emitUpdate: false });
+        setLoadedRight(rightDate);
+        return;
+      }
       if (cancelled) return;
+      setLoadError(null);
+      editor.setEditable(true);
       draft.current = entry ? { ...emptyPayload(), ...entry } : emptyPayload();
       setTitle(draft.current.title);
       setMood(draft.current.mood);
@@ -172,11 +197,12 @@ export function WriteView({ date, onDateChange, onSaved }: Props) {
       editor.commands.setContent(pageContent(draft.current, rightDate, entry?.updatedAt ?? null), { emitUpdate: false });
       hadCursor.current = false;
       setStatus(entry ? "saved" : "idle");
+      editingDate.current = rightDate;
       setLoadedRight(rightDate);
       if (rightDate === todayISO()) { editor.commands.focus("end"); hadCursor.current = true; }
     })();
     return () => { cancelled = true; };
-  }, [rightDate, editor, flush, setStatus]);
+  }, [rightDate, editor, flush, setStatus, reloadKey]);
 
   useEffect(() => {
     if (!leftEditor) return;
@@ -210,7 +236,7 @@ export function WriteView({ date, onDateChange, onSaved }: Props) {
       try {
         const id = await api.addVoiceNote(rec.bytes);
         const note: VoiceNote = { id, mime: rec.mime, durationMs: rec.durationMs, recordedAt: rec.recordedAt, peaks: rec.peaks, transcript: "" };
-        if (forDate === dateRef.current && editor) {
+        if (forDate === editingDate.current && editor) {
           insertVoiceNote(editor, note, hadCursor.current);
         } else {
           await flush();
@@ -230,7 +256,7 @@ export function WriteView({ date, onDateChange, onSaved }: Props) {
 
   const saveVideo = useCallback(
     async (forDate: string, note: VideoNote) => {
-      if (forDate === dateRef.current && editor) {
+      if (forDate === editingDate.current && editor) {
         insertVideoNote(editor, note, hadCursor.current);
       } else {
         await flush();
@@ -246,7 +272,7 @@ export function WriteView({ date, onDateChange, onSaved }: Props) {
   );
 
   const today = todayISO();
-  const pageIsEmpty = words === 0 && !hasMedia && photos.length === 0;
+  const pageIsEmpty = !loadError && words === 0 && !hasMedia && photos.length === 0;
   const prompt = promptFor(rightDate, promptShift);
   const toggleFavourite = () => {
     const next = !favourite;
@@ -309,6 +335,12 @@ export function WriteView({ date, onDateChange, onSaved }: Props) {
                 <div className="page-body page-lines">
                   {title && <p className="page-title">{title}</p>}
                   <EditorContent editor={editor} />
+                  {loadError && (
+                    <div className="mt-4 font-sans text-[12.5px] leading-relaxed text-danger" role="alert">
+                      <p>Couldn't open this page: {loadError}</p>
+                      <button onClick={() => setReloadKey((n) => n + 1)} className="mt-1.5 underline underline-offset-4 transition hover:text-ink">Try again</button>
+                    </div>
+                  )}
                   {pageIsEmpty && (
                     <div className="mt-4 animate-fade-in font-sans text-[12.5px] leading-relaxed text-muted">
                       <p className="flex items-start gap-1.5">
