@@ -91,10 +91,14 @@ export function LockScreen({ mode, touchId, hasRecovery, onUnlocked }: Props) {
     try {
       if (mode === "setup") {
         await api.setupPassword(password);
-        const key = await api.createRecoveryKey(password);
         setPassword("");
         setConfirm("");
-        setNewKey(key); // onUnlocked waits until the key has been seen
+        try {
+          setNewKey(await api.createRecoveryKey(password)); // onUnlocked waits until the key has been seen
+        } catch {
+          // The diary exists and is open; a recovery key can be made in Settings.
+          onUnlocked();
+        }
         return;
       }
       await api.unlock(password);

@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { device } from "./platform";
 
 /** Downscale anything bigger than this (longest side, px) before storing. */
 const MAX_SIDE = 2400;
@@ -14,7 +15,7 @@ export async function prepareImage(file: Blob): Promise<Uint8Array> {
   try {
     bitmap = await createImageBitmap(file);
   } catch {
-    throw new Error("That file isn't an image this Mac can open.");
+    throw new Error(`That file isn't an image this ${device} can open.`);
   }
   const { width, height } = bitmap;
   const scale = Math.min(1, MAX_SIDE / Math.max(width, height));

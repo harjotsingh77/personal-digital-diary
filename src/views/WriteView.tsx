@@ -364,11 +364,13 @@ export function WriteView({ date, onDateChange, onSaved }: Props) {
                       </p>
                     </div>
                   )}
-                  <PhotoStrip
-                    photos={photos}
-                    onChange={(p) => { setPhotos(p); update({ photos: p }); }}
-                    openPicker={pickPhoto}
-                  />
+                  {!loadError && (
+                    <PhotoStrip
+                      photos={photos}
+                      onChange={(p) => { setPhotos(p); update({ photos: p }); }}
+                      openPicker={pickPhoto}
+                    />
+                  )}
                 </div>
               </div>
 

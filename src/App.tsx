@@ -58,7 +58,10 @@ export default function App() {
   useAutoLock(!!status?.unlocked, AUTO_LOCK_MS, lock);
 
   useEffect(() => {
-    if (status?.unlocked) refreshStats();
+    if (!status?.unlocked) return;
+    refreshStats();
+    // Unlocking opens on today's page, even if the diary was locked yesterday.
+    setDate(todayISO());
   }, [status?.unlocked, refreshStats]);
 
   useEffect(() => {

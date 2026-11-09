@@ -3,6 +3,7 @@ import { Bell, BookText, Palette, Check, Copy, Download, Fingerprint, FolderOpen
 import { api, errorMessage, type AutoBackupInfo, type ImportResult } from "../lib/api";
 import { addDays, todayISO } from "../lib/dates";
 import { printBook } from "../lib/printBook";
+import { holdAutoLock } from "../hooks/useAutoLock";
 import { biometricName, device, isIOS } from "../lib/platform";
 import {
   ACCENT_COLOURS, applyPageFont, DEFAULT_COLOURS, isDark, loadColours, PAGE_COLOURS, pageFont, saveColours,
@@ -116,8 +117,8 @@ function SecuritySection() {
         <Toggle on={!!bio?.enabled} disabled={!bio?.available || busy} onClick={toggle} label={`Unlock with ${biometricName}`} />
       </div>
       <div className="mt-4 border-t border-line pt-4 text-[12.5px] leading-relaxed text-muted">
-        The diary locks itself after <span className="text-ink">5 minutes</span> without activity. Press{" "}
-        <kbd className="rounded border border-line px-1 text-[11px]">⌘L</kbd> to lock it any time.
+        The diary locks itself after <span className="text-ink">5 minutes</span> without activity.{" "}
+        {isIOS ? "Tap the lock to lock it any time." : <>Press <kbd className="rounded border border-line px-1 text-[11px]">⌘L</kbd> to lock it any time.</>}
       </div>
       {msg && <Message {...msg} />}
     </Card>
@@ -393,6 +394,10 @@ function BackupSection({ onDataChanged }: { onDataChanged: () => void }) {
   const [includeVideos, setIncludeVideos] = useState(true);
   const [importing, setImporting] = useState<string | null>(null);
   const [importPassword, setImportPassword] = useState("");
+
+  // A long backup or import counts as activity, so the diary doesn't lock
+  // (and forget its key) half-way through.
+  useEffect(() => (busy ? holdAutoLock() : undefined), [busy]);
 
   const describeImport = (r: Pick<ImportResult, "imported" | "skipped">) =>
     `Imported ${r.imported} ${r.imported === 1 ? "page" : "pages"}${r.skipped ? ` · skipped ${r.skipped} already up to date` : ""}.`;

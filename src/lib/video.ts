@@ -1,4 +1,5 @@
 import { api, type VideoNote } from "./api";
+import { device, privacySettings } from "./platform";
 
 /** WKWebView (the real app) records H.264 in mp4; Chromium prefers WebM. */
 const MIME_CANDIDATES = ["video/mp4", "video/webm;codecs=vp9,opus", "video/webm"];
@@ -9,10 +10,10 @@ const POSTER_WIDTH = 480;
 function cameraError(e: unknown): Error {
   const name = e instanceof DOMException ? e.name : "";
   if (name === "NotAllowedError" || name === "SecurityError") {
-    return new Error("Camera access is off. Allow Diary in System Settings → Privacy & Security → Camera.");
+    return new Error(`Camera access is off. ${privacySettings("Camera")}`);
   }
   if (name === "NotFoundError" || name === "OverconstrainedError") return new Error("No camera found.");
-  if (typeof MediaRecorder === "undefined") return new Error("Video recording isn't supported on this Mac.");
+  if (typeof MediaRecorder === "undefined") return new Error(`Video recording isn't supported on this ${device}.`);
   return new Error("Couldn't start the camera.");
 }
 

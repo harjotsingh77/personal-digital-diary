@@ -7,5 +7,9 @@ export const isIOS =
 /** "this iPhone" / "this Mac" in sentences. */
 export const device = isIOS ? (/iPad/.test(navigator.userAgent) || navigator.maxTouchPoints > 1 && !/iPhone/.test(navigator.userAgent) ? "iPad" : "iPhone") : "Mac";
 
+/** Where people turn on camera / microphone access for the app. */
+export const privacySettings = (what: "Camera" | "Microphone") =>
+  isIOS ? `Allow Diary in Settings → Privacy & Security → ${what}.` : `Allow Diary in System Settings → Privacy & Security → ${what}.`;
+
 /** The phone unlocks with Face ID; the Mac with Touch ID. */
 export const biometricName = isIOS ? "Face ID" : "Touch ID";

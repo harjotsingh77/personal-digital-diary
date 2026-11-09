@@ -1,4 +1,5 @@
 import { api, type VoiceNote } from "./api";
+import { device, privacySettings } from "./platform";
 
 /** WKWebView (the real app) records AAC in mp4; Chromium prefers WebM/Opus. */
 const MIME_CANDIDATES = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"];
@@ -19,10 +20,10 @@ export interface Recording {
 function micError(e: unknown): Error {
   const name = e instanceof DOMException ? e.name : "";
   if (name === "NotAllowedError" || name === "SecurityError") {
-    return new Error("Microphone access is off. Allow Diary in System Settings → Privacy & Security → Microphone.");
+    return new Error(`Microphone access is off. ${privacySettings("Microphone")}`);
   }
   if (name === "NotFoundError" || name === "OverconstrainedError") return new Error("No microphone found.");
-  if (typeof MediaRecorder === "undefined") return new Error("Voice recording isn't supported on this Mac.");
+  if (typeof MediaRecorder === "undefined") return new Error(`Voice recording isn't supported on this ${device}.`);
   return new Error("Couldn't start recording.");
 }
 
